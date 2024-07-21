@@ -1,0 +1,114 @@
+---
+title: "Scraping web data with R and Docker"
+author: "Milt"
+date: "2020-10-28"
+categories: ["Data Science/Programming"]
+---
+
+### Introduction
+
+I've spent a considerable amount of time sifting through tutorials on how to scrape data from the web. Both R and Python offer tools to easily parse html data but so far the only easy solution I've found to scrape dynamic data rendered though JS (maybe it's JS?, either way it shows up magicially on the screen but isn't in the html to parse) is in R.
+
+For this little project we will be recording the building capacity counts for the UW Madison Rec. Inside this site there are two pages we'll want to scrape. The first page is the overall building capactiy at `https://services.recwell.wisc.edu/FacilityOccupancy` and a more granular look at specific area capactiy in `https://recwell.wisc.edu/liveusage/`.
+
+Lastly, I don't remember what I've installed onto my computer to make this all run, but you don't need to worry about that because we'll also put together a docker image you can build to easily run both of the examples below.
+
+### Using rvest (EASY MODE)
+
+First we'll start with scraping overall building occupancy. For this we just need to grab the HTML from the URL `https://services.recwell.wisc.edu/FacilityOccupancy` and strip out the numbers that we want using their xpaths.
+
+``` r
+library(rvest)
+library(tidyverse)
+urlPath <- 'https://services.recwell.wisc.edu/FacilityOccupancy'
+html <- read_html(urlPath) 
+
+#output of html
+> html
+{html_document}  
+<html lang="en-US">
+[1] <head>\n<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">\n<link rel="icon" href="~/favicon.ico">\n<meta charset="utf-8">\n<meta name="v 
+[2] <body>\r\n    <div role="complementary" aria-label="skip to main content"><a id="skipLink" class="skip-main" tabindex="1" onclick="$('#mainContent').find( 
+```
+
+Now we have a list of html text stored in the variable `html` (output shown above). Inside of `html` are the two numbers we want to extract: Current Occupancy and max Occupancy. First you need to find the xpaths (or something similiar) for each occupancy value you want to pull out. If you don't know how to do this just search for 'finding xpath in chrome' and you're sure to find something. Once you have the xpath for the values you want the rest is pretty straightforward.
+
+``` r
+occupancy <- 
+  html %>%
+  html_nodes(xpath='//*[@id="occupancy-65cc2f42-1ca8-4afe-bf5a-990b1a9e4111"]/div[2]/p[3]/strong | //*[@id="occupancy-65cc2f42-1ca8-4afe-bf5a-990b1a9e4111"]/div[2]/p[1]/strong') %>%
+  html_text() %>% 
+  str_replace("%","") %>% 
+  as.numeric() 
+  
+> occupancy
+[1] 222  73
+```
+
+In the code above, `html_nodes()` will extract the values we want from the html based on the xpaths we gave it to look for. This value will still have html tags on it (e.g. \<strong\> 222 \</strong\>) which we can remove using the `html_text()` function. From there it's just some simple cleanup to remove special characters with `str_replace()` and convert them from character into numeric using `as.numeric()`.
+
+Finally we can take our vector and turn it into a dataframe for additional manipulation.
+
+``` r
+df <- data.frame(max_occupancy  = occupancy[1], current_occupancy = occupancy[2]/100, pulled = Sys.time())
+> df
+  max_occupancy current_occupancy              pulled
+1           222              0.73 2020-10-28 19:35:19
+```
+
+### Using pagedown and pdftools
+
+OK, now lets wrap this up and head over to `https://recwell.wisc.edu/liveusage/`, grab a few xpaths and be good to go. Unfortunatly this one isn't quite as easy.
+
+``` r
+urlPath <- 'https://recwell.wisc.edu/liveusage/'
+html <- read_html(urlPath)
+
+html %>%
+html_nodes(xpath='//*[@id="nick"]/div/div[2]/div[2]/div/div/div[1]/div/div[2]/p[2]/span[1]') %>%
+  html_text()
+  
+[1] "0"
+```
+
+The code above will return 0 instead of 18 which is the correct value at the time I ran this example. I believe 0 is a placeholder and the actual value gets updated at a later time. Either way, it doesn't look like the method we used above will work for us so we'll have to shift gears a bit.
+
+The most reliable way I've found to scrape this type of data is to use `pagedown` to print the page to a pdf. Then use `pdftools` to read the pdf back into R. Then use some regular expression magic to parse everything you need.
+
+``` r
+#Set some variables
+library(pdftools)
+library(tidyverse)
+urlPath <- 'https://recwell.wisc.edu/liveusage/'
+pdfPath <- "./rec.pdf"
+
+#Print out the webpage to pdf using pagedown
+pagedown::chrome_print(urlPath,pdfPath,extra_args = '--no-sandbox')
+
+#Read in the pdf again using pdftools (and some stringr magic)
+x <- str_squish(unlist(str_split(str_flatten(pdf_text(pdfPath)),"\n")))
+
+#Use regular expressions to parse out the data we want to keep
+values_bool <- str_detect(x,"^Updated (.*?) \\d+ / \\d+")
+label_bool <- values_bool[c(2:length(values_bool),FALSE)]
+
+#Turn it into a dataframe for additional manipulation.
+data.frame(location = x[label_bool],values = x[values_bool])
+```
+
+### Making it easy with Docker
+
+You can build your own image using the Dockerfile code below, or pull mine from docker hub at mjholt02/pagedown.
+
+``` r
+FROM r-base
+
+RUN apt-get update -qq && apt-get -y install libssl-dev \
+    chromium libcurl4-openssl-dev \ 
+    libxml2-dev libpoppler-cpp-dev libpq-dev
+
+RUN install2.r RPostgres pagedown pdftools tidyverse \ 
+    rvest
+```
+
+From there is as easy as starting up an interactive container using `docker run --rm -it mjholt02/pagedown` or `winpty docker run --rm -it mjholt02/pagedown` if you're using git bash.

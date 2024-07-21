@@ -1,0 +1,35 @@
+---
+title: "My Docker notes"
+author: "Milt"
+date: "2024-01-05"
+categories: ["Data Science/Programming"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE)
+
+```
+
+<hr>
+
+Starting rocker/rstudio detached in powershell
+
+1.  Open Powershell using "Run as Adminstrator" option in right click menu.
+
+2.  Run `docker run --rm -ti -d -e PASSWORD=pw -p 8787:8787 -v //c/Users/milt:/tmp rocker/rstudio`
+
+3.  Open browser and go to `http://localhost:8787/` , log in using the username `rstudio` and password `pw`
+
+<br> <br>
+
+Starting rocker/rstudio detached in gitbash
+
+1.  Open Git Bash using "Run as Adminstrator" option in right click menu.
+
+2.  Run one of the two variations below.
+
+    1.  `winpty docker run --rm -ti -d -e PASSWORD=pw -p 8787:8787 -v //c/Users/milt:/tmp rocker/rstudio`
+
+    2.  `winpty docker run --rm -ti -e PASSWORD=pw -p 8787:8787 -v //c/Users/milt:/tmp rocker/rstudio &`
+
+3.  Open browser and go to `http://localhost:8787/` , log in using the username `rstudio` and password `pw`
