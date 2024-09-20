@@ -2,6 +2,7 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/wikipediaDash/wikipediaDash.html",
       "/posts/DockerNotes/index.html",
       "/posts/renv_blog/index.html",
       "/posts/R_CountYourChickens/index.html",
