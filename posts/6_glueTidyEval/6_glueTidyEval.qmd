@@ -1,0 +1,176 @@
+---
+title: "Using character values in dplyr functions."
+author: "MJH"
+date: "2024-09-20"
+categories: ["Data Science/Programming"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE)
+options(dplyr.summarise.inform = FALSE)
+library(tidyverse)
+```
+
+
+
+In the book [R for Data Science (2e)](https://r4ds.hadley.nz/) there is a section titled [25.3.1 Indirection and tidy evaluation](https://r4ds.hadley.nz/functions#indirection-and-tidy-evaluation) which discusses how to use dplyr code inside of functions.  They do a really good job of outlining how to utilize embracing `{{}}` so your variables properly resolve, but there does not seem to be any space dedicated on how to incorporate character variables generated via `paste0()`,`paste()`,`str_glue()`,`glue::glue()`, etc... into these dplyr functions. For me, this problem typically arises when I'm trying to nest a function inside a loop that utilizes `paste()` or `str_glue()` to dynamically generate the variable names I need to call in the function.       
+
+
+
+Lets load the libraries we'll use.
+```{r, message=FALSE}
+library(tidyverse)
+```
+
+Next, lets create a simple data set we'll use for our examples.
+```{r}
+set.seed(8675309)
+
+df <- tibble(
+  group1 = c(rep("A",10),rep("B",10)),
+  group2 = rep(  c(rep("C",5),rep("D",5))   ,2),
+  group3 = rep(  c(rep("E",2),rep("F",3))   ,4),
+  value = round(rnorm(20,100,15))
+)
+glimpse(df)
+```
+
+Some simple dplyr code, we'll turn the second output into a function.
+```{r}
+
+df |>
+  summarize(mean = mean(value)) 
+
+df |>
+  group_by(group1, group2, group3) |>
+  summarize(mean = mean(value)) %>%
+  ungroup()
+
+```
+
+
+Lets say we're ready to create a function to wrap around this dplyr code.  This is where [embracing ({{}})](https://r4ds.hadley.nz/functions#sec-embracing) comes into the picture.  Any variable we want to evaluate in the function needs to be embraced, otherwise it will not evaluate correctly.  As a side note, using `across()` in the `group_by()` allows us to use multiple variables in our group_vars input.
+
+```{r}
+function1 <- function(input_data, summary_variable, group_vars=NULL){
+  input_data |>
+  group_by(across({{group_vars}})) |>
+  summarize(mean_calc = mean({{summary_variable}})) %>%
+  ungroup()
+}
+
+function1(input_data = df, summary_variable = value)
+function1(input_data = df, summary_variable = value, group_vars = group1)
+function1(input_data = df, summary_variable = value, group_vars = c(group1,group2))
+
+```
+
+
+So this is fine, and typically works great, but if you ever run into an instance where you're trying to pass a character string as a variable name it's going to be a problem.  For these examples we'll just use character strings to mimic the output of `paste()` or `str_glue()` to keep things a bit easier to read.
+
+
+```{r}
+sum_string <- "value"
+
+function1(input_data = df, summary_variable = sum_string)
+
+```
+
+
+
+So you get an error, and there are a few ways that you can work around this using `get()` and `str2lang()`/`do.call()` but it sometimes gets overly complex and is inconsistent for our example here. In the end we'll use a combination of `!!` and `sym()` which offers concise and consistent syntax with the ability to carry multiple variables into our `group_by()`.  Something that I was unable to get to working using the examples below. 
+
+```{r,error=TRUE}
+
+sum_string <- "value"
+grp_string1 <- "group1"
+
+#works
+function1(
+  input_data = df, 
+  summary_variable = get(sum_string),
+  group_vars = str2lang(grp_string1))
+
+#doesn't work
+function1(
+  input_data = df, 
+  summary_variable = get(sum_string),
+  group_vars = get(grp_string1))
+
+#doesn't work
+function1(input_data = df, 
+          summary_variable = str2lang(sum_string),
+          group_vars = str2lang(grp_string1))
+
+#works
+do.call(
+  what = function1, 
+  args = list(input_data = df, 
+              summary_variable = str2lang(sum_string),
+              group_vars = str2lang(grp_string1))
+  )
+
+#doesn't work
+do.call(
+  what = function1, 
+  args = list(input_data = df, 
+              summary_variable = get(sum_string),
+              group_vars = str2lang(grp_string1))
+  )
+
+```
+
+
+In the end, we'll end up writing our function incorporating `!!` and `sym()` to make the call less verbose. Although if you are unable to modify the function you're trying to utilize, this might be your best course of action utilizing it in the function call.  `sym()` or `str2lang()` seem to behavior similar on the examples below and for this context seem to be interchangable.  
+
+
+```{r}
+sum_string <- "value"
+grp_string1 <- "group1"
+grp_string2 <- "group2"
+
+function1(input_data = df, summary_variable = !!sym(sum_string))
+function1(input_data = df, summary_variable = !!sym(sum_string), group_vars = !!sym(grp_string1))
+function1(input_data = df, summary_variable = !!sym(sum_string), group_vars = c(!!sym(grp_string1),!!sym(grp_string2)))
+
+#sym() and str2lang() seem to behavior similar here.
+function1(input_data = df, summary_variable = !!str2lang(sum_string), group_vars = c(!!str2lang(grp_string1),!!str2lang(grp_string2)))
+```
+
+If you wanted to make your call a little neater, you could also wrap your character string in `sym()` or `str2lang()` outside of the call.
+```{r}
+sum_string <- sym("value")
+grp_string1 <- sym("group1")
+grp_string2 <- str2lang("group2")
+
+function1(input_data = df, summary_variable = !!sum_string, group_vars = c(!!grp_string1,!!grp_string2))
+
+```
+
+
+
+
+In the end though, it still takes some work to make these calls and it's not a real great solution for the use case of throwing a function inside a loop and letting it fly.  Below would be what I would choose to use in the case I had control and the ability to write the function from scratch.
+
+```{r}
+summarize_by_group <- function(input_data, summary_variable, group_vars = NULL) {
+  if(!is.null(group_vars)){
+    grp_squished <- str_replace_all(group_vars," ","")
+    grp_split <- str_split(grp_squished, ",")[[1]]
+    group_syms <- syms(grp_split)
+    }else{group_syms = NULL}
+  input_data |>
+    group_by(!!!group_syms) |>
+    summarize(mean = mean(!!sym(summary_variable)))
+}
+
+sum_string <- "value"
+grp_string1 <- "group1"
+grp_string2 <- "group1,group2"
+
+summarize_by_group(input_data = df, summary_variable = sum_string)
+summarize_by_group(input_data = df, summary_variable = sum_string, group_vars=grp_string1)
+summarize_by_group(input_data = df, summary_variable = sum_string, group_vars=grp_string2)
+
+```
+

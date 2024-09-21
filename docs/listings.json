@@ -2,6 +2,7 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/6_glueTidyEval/6_glueTidyEval.html",
       "/posts/wikipediaDash/wikipediaDash.html",
       "/posts/DockerNotes/index.html",
       "/posts/renv_blog/index.html",
