@@ -2,7 +2,7 @@
   "hash": "06c2e239d77cfbabc542222e018560b2",
   "result": {
     "engine": "jupyter",
-    "markdown": "---\ntitle: \"A fresh start\"\nauthor: \"\"\ndate: \"2024-10-27\"\ncategories: []\n---\n\n\nThis is the first post in a Quarto blog. Welcome!\n\n![](thumbnail.jpg)\n\nSince this post doesn't specify an explicit `image`, the first image in the post will be used in the listing page of posts.\n\n::: {#4f933a22 .cell execution_count=1}\n\n::: {.cell-output .cell-output-display execution_count=1}\n```\n8\n```\n:::\n:::\n\n\n",
+    "markdown": "---\ntitle: \"A fresh start\"\nauthor: \"\"\ndate: \"2024-10-27\"\ncategories: []\n---\n\n\n\n\nThis is the first post in a Quarto blog. Welcome!\n\n![](thumbnail.jpg)\n\nSince this post doesn't specify an explicit `image`, the first image in the post will be used in the listing page of posts.\n\n::: {#d24a5317 .cell execution_count=1}\n\n::: {.cell-output .cell-output-display execution_count=1}\n```\n8\n```\n:::\n:::\n\n\n",
     "supporting": [
       "index_files"
     ],
