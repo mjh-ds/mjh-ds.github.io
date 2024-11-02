@@ -1,14 +1,16 @@
 ---
 title: ""
 listing:
-  contents: posts
+  contents: posts 
   sort: "date desc"
-  type: default
-  categories: true
-  sort-ui: false
+  type: table
+  categories: unnumbered
+  sort-ui: true
   filter-ui: false
+  field-display-names:
+    author: "Language"
+  fields: [date, title,categories]
 page-layout: full
 title-block-banner: true
 ---
-
 

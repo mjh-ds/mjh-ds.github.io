@@ -1,5 +1,6 @@
 project:
   type: website
+  output-dir: docs
 
 website:
   title: "My Notebook"
@@ -8,14 +9,18 @@ website:
       - about.qmd
       - icon: github
         href: https://github.com/
-      - icon: linkedin
-        href: https://github.com/
-      - icon: bi-code-square
-        href: https://platform.stratascratch.com/user/mholt
+      - icon: twitter
+        href: https://twitter.com
 format:
   html:
-    theme: cosmo
+    theme:
+      dark: darkly
+      light: cosmo
     css: styles.css
+    highlight-style: eiffel
+
+editor: visual
+
 
 
 
